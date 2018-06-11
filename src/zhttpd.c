@@ -351,6 +351,7 @@ void add_info(MagickWand *im, evhtp_request_t *req) {
  */
 void dump_request_cb(evhtp_request_t *req, void *arg) {
     const char *uri = req->uri->path->full;
+    zimg_headers_add(req, settings.headers);
 
     //switch (evhtp_request_t_get_command(req)) {
     int req_method = evhtp_request_get_method(req);
@@ -430,11 +431,12 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
         }
         if (filename[0] != '\0' && mp_arg->check_name == -1) {
             LOG_PRINT(LOG_ERROR, "%s fail post type", mp_arg->address);
-            evbuffer_add_printf(mp_arg->req->buffer_out,
+         /*   evbuffer_add_printf(mp_arg->req->buffer_out,
                                 "<h1>File: %s</h1>\n"
                                 "<p>File type is not supported!</p>\n",
                                 filename
                                );
+        */
         }
     }
     //multipart_parser_set_data(p, mp_arg);
@@ -466,12 +468,14 @@ int on_chunk_data(multipart_parser* p, const char *at, size_t length) {
     } else {
         mp_arg->succno++;
         LOG_PRINT(LOG_INFO, "%s succ post pic:%s size:%d", mp_arg->address, md5sum, length);
-        evbuffer_add_printf(mp_arg->req->buffer_out,
+/*        evbuffer_add_printf(mp_arg->req->buffer_out,
                             "<h1>MD5: %s</h1>\n"
                             "Image upload successfully! You can get this image via this address:<br/><br/>\n"
-                            "<a href=\"/%s\">http://yourhostname:%d/%s</a>?w=width&h=height&g=isgray&x=position_x&y=position_y&r=rotate&q=quality&f=format\n",
-                            md5sum, md5sum, settings.port, md5sum
+                            "<a href=\"/%s\">http://%s:%d/%s</a>?w=width&h=height&g=isgray&x=position_x&y=position_y&r=rotate&q=quality&f=format\n",
+                            md5sum, md5sum, settings.host,settings.port, md5sum
                            );
+*/
+        evbuffer_add_printf(mp_arg->req->buffer_out,"{\"url\":\"%s/%s\"}",settings.host,md5sum);
     }
     return 0;
 }
@@ -484,6 +488,7 @@ int json_return(evhtp_request_t *req, int err_no, const char *md5sum, int post_s
     cJSON *j_ret_info = cJSON_CreateObject();
     if (err_no == -1) {
         cJSON_AddBoolToObject(j_ret, "ret", 1);
+        cJSON_AddStringToObject(j_ret_info, "host", settings.host);
         cJSON_AddStringToObject(j_ret_info, "md5", md5sum);
         cJSON_AddNumberToObject(j_ret_info, "size", post_size);
         cJSON_AddItemToObject(j_ret, "info", j_ret_info);
@@ -534,14 +539,14 @@ int multipart_parse(evhtp_request_t *req, const char *content_type, const char *
     char *boundaryPattern = NULL;
     int boundary_len = 0;
     mp_arg_t *mp_arg = NULL;
-
+/*
     evbuffer_add_printf(req->buffer_out,
                         "<html>\n<head>\n"
                         "<title>Upload Result</title>\n"
                         "</head>\n"
                         "<body>\n"
                        );
-
+*/
     if (strstr(content_type, "boundary") == 0) {
         LOG_PRINT(LOG_DEBUG, "boundary NOT found!");
         LOG_PRINT(LOG_ERROR, "%s fail post parse", address);
@@ -610,11 +615,12 @@ int multipart_parse(evhtp_request_t *req, const char *content_type, const char *
     multipart_parser_free(parser);
 
     if (mp_arg->succno == 0) {
-        evbuffer_add_printf(req->buffer_out, "<h1>Upload Failed!</h1>\n");
+    //    evbuffer_add_printf(req->buffer_out, "<h1>Upload Failed!</h1>\n");
+          evbuffer_add_printf(req->buffer_out,"{\"ret\":\"false\"}");
     }
 
-    evbuffer_add_printf(req->buffer_out, "</body>\n</html>\n");
-    evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "text/html", 0, 0));
+//    evbuffer_add_printf(req->buffer_out, "</body>\n</html>\n");
+    evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "application/json", 0, 0));
     err_no = -1;
 
 done:
@@ -630,6 +636,7 @@ done:
  * @param arg It is not useful.
  */
 void post_request_cb(evhtp_request_t *req, void *arg) {
+    zimg_headers_add(req, settings.headers);
     int post_size = 0;
     char *buff = NULL;
     int err_no = 0;
@@ -730,7 +737,7 @@ void post_request_cb(evhtp_request_t *req, void *arg) {
     if (strstr(content_type, "multipart/form-data") == NULL) {
         err_no = binary_parse(req, content_type, address, buff, post_size);
     } else {
-        ret_json = 0;
+        ret_json = 1;
         err_no = multipart_parse(req, content_type, address, buff, post_size);
     }
     if (err_no != -1) {
@@ -770,7 +777,10 @@ done:
  * @param arg It is not useful.
  */
 void get_request_cb(evhtp_request_t *req, void *arg) {
+
+    zimg_headers_add(req, settings.headers);
     char *md5 = NULL, *fmt = NULL, *type = NULL;
+    char *filename = NULL;
     zimg_req_t *zimg_req = NULL;
     char *buff = NULL;
     size_t len;
@@ -903,6 +913,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
         if (settings.disable_args != 1) {
             const char *str_w = evhtp_kv_find(params, "w");
             const char *str_h = evhtp_kv_find(params, "h");
+            filename = evhtp_kv_find(params,"n");
             width = (str_w) ? atoi(str_w) : 0;
             height = (str_h) ? atoi(str_h) : 0;
 
@@ -935,6 +946,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
                     str_lcpy(fmt, str_f, fmt_len);
                 LOG_PRINT(LOG_DEBUG, "fmt = %s", fmt);
             }
+
         }
 
         if (settings.disable_type != 1) {
@@ -962,7 +974,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
     zimg_req -> type = type;
     zimg_req -> width = width;
     zimg_req -> height = height;
-    zimg_req -> proportion = proportion;
+    zimg_req -> proportion = 0;
     zimg_req -> gray = gray;
     zimg_req -> x = x;
     zimg_req -> y = y;
@@ -1000,7 +1012,31 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
 
     LOG_PRINT(LOG_DEBUG, "Got the File!");
     evhtp_headers_add_header(req->headers_out, evhtp_header_new("Server", settings.server_name, 0, 1));
-    evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "image/jpeg", 0, 0));
+    if(filename)
+    {
+        char * ext = strstr(filename,".");
+        if(ext)
+        {
+            ext = ext +1;
+            if (strcmp(ext,"pdf")==0 || strcmp(ext,"rar")==0 || strcmp(ext,"docx")==0 || strcmp(ext,"doc")==0 || strcmp(ext,"csv")==0)
+            {
+                char content[32]="application/";
+
+                strcat(content,ext);
+                evhtp_headers_add_header(req->headers_out,evhtp_header_new("Content-Type",content,0,0));
+
+            }
+
+            if(strcmp(ext,"pdf")!=0)
+            {
+                char temp[80]="attachment;filename=";
+                strcat(temp,filename);
+                evhtp_headers_add_header(req->headers_out,evhtp_header_new("content-disposition",temp,0,0));
+            }
+        }
+    }
+    else
+        evhtp_headers_add_header(req->headers_out, evhtp_header_new("Content-Type", "image/jpeg", 0, 0));
     zimg_headers_add(req, settings.headers);
     evhtp_send_reply(req, EVHTP_RES_OK);
     if (type)
@@ -1033,6 +1069,8 @@ done:
     free(type);
     free(zimg_req);
     free(buff);
+    //if (filename)
+    //    free(filename);
 }
 
 /**
@@ -1204,6 +1242,7 @@ err:
 void info_request_cb(evhtp_request_t *req, void *arg) {
     char md5[33];
     int err_no = 0;
+    zimg_headers_add(req, settings.headers);
 
     evhtp_connection_t *ev_conn = evhtp_request_get_connection(req);
     struct sockaddr *saddr = ev_conn->saddr;

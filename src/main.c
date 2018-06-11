@@ -180,6 +180,11 @@ static int load_conf(const char *conf) {
         str_lcpy(settings.ip, lua_tostring(L, -1), sizeof(settings.ip));
     lua_pop(L, 1);
 
+    lua_getglobal(L,"host");
+    if(lua_isstring(L,-1))
+        str_lcpy(settings.host,lua_tostring(L,-1),sizeof(settings.host));
+    lua_pop(L,1);
+
     lua_getglobal(L, "port");
     if (lua_isnumber(L, -1))
         settings.port = (int)lua_tonumber(L, -1);

@@ -71,6 +71,7 @@ struct setting {
     lua_State *L;
     int is_daemon;
     char ip[128];
+    char host[128];
     int port;
     int num_threads;
     int backlog;

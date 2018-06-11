@@ -5,6 +5,7 @@
 is_daemon       = 1
 --绑定IP
 ip              = '0.0.0.0'
+host            = 'http://192.168.0.211'
 --端口
 port            = 4869
 --运行线程数，默认值为服务器CPU数
@@ -17,7 +18,7 @@ pwd             = io.popen('pwd'):read('*l')
 
 --header config
 --返回时所带的HTTP header
-headers         = 'Cache-Control:max-age=7776000'
+headers = 'Cache-Control:max-age=7776000;Access-Control-Allow-Origin:*;Access-Control-Allow-Methods:POST'
 --是否启用etag缓存
 etag            = 1
 
@@ -25,11 +26,11 @@ etag            = 1
 --support mask rules like 'allow 10.1.121.138/24'
 --NOTE: remove rule can improve performance
 --上传接口的IP控制权限，将权限规则注释掉可以提升服务器处理能力，下同
---upload_rule   = 'allow all'
+--upload_rule   = 'allow 192.168.78.1'
 --下载接口的IP控制权限
---download_rule = 'allow all'
+--download_rule = 'allow 192.168.78.1;allow 192.168.0.142;'
 --管理接口的IP控制权限
-admin_rule      = 'allow 127.0.0.1'
+--admin_rule      = 'allow 127.0.0.1'
 
 --cache config
 --是否启用memcached缓存
@@ -74,7 +75,7 @@ disable_zoom_up = 0
 script_name     = pwd .. '/script/process.lua'
 --format value: 'none' for original or other format names
 --默认保存新图的格式，字符串'none'表示以原有格式保存，或者是期望使用的格式名
-format          = 'jpeg'
+format          = 'none'
 --quality value: 1~100(default: 75)
 --默认保存新图的质量
 quality         = 75
@@ -92,7 +93,7 @@ save_new        = 1
 --上传图片大小限制，默认100MB
 max_size        = 100*1024*1024
 --允许上传图片类型列表
-allowed_type    = {'jpeg', 'jpg', 'png', 'gif', 'webp'}
+allowed_type    = {'jpeg', 'jpg', 'png', 'gif', 'webp','ogg','mp4','txt','pdf','rar'}
 
 --mode[1]: local disk mode
 --本地存储时的存储路径
