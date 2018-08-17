@@ -899,7 +899,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
     int width, height, proportion, gray, x, y, rotate, quality, sv;
     width = 0;
     height = 0;
-    proportion = 1;
+    proportion = 0;
     gray = 0;
     x = -1;
     y = -1;
@@ -918,7 +918,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
             height = (str_h) ? atoi(str_h) : 0;
 
             const char *str_p = evhtp_kv_find(params, "p");
-            proportion = (str_p) ? atoi(str_p) : 1;
+            proportion = (str_p) ? atoi(str_p) : 0;
 
             const char *str_g = evhtp_kv_find(params, "g");
             gray = (str_g) ? atoi(str_g) : 0;
@@ -932,12 +932,19 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
                 proportion = 1;
             }
 
+            if (width !=0 || height !=0 || gray!=0) {
+                proportion = 1;
+            }
+
             const char *str_r = evhtp_kv_find(params, "r");
             rotate = (str_r) ? atoi(str_r) : 0;
 
             const char *str_q = evhtp_kv_find(params, "q");
             quality = (str_q) ? atoi(str_q) : 0;
 
+            if(quality != 0){
+                proportion = 1;
+            }
             const char *str_f = evhtp_kv_find(params, "f");
             if (str_f) {
                 size_t fmt_len = strlen(str_f) + 1;
@@ -974,7 +981,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
     zimg_req -> type = type;
     zimg_req -> width = width;
     zimg_req -> height = height;
-    zimg_req -> proportion = 0;
+    zimg_req -> proportion = proportion;
     zimg_req -> gray = gray;
     zimg_req -> x = x;
     zimg_req -> y = y;
@@ -1018,7 +1025,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
         if(ext)
         {
             ext = ext +1;
-            if (strcmp(ext,"pdf")==0 || strcmp(ext,"rar")==0 || strcmp(ext,"docx")==0 || strcmp(ext,"doc")==0 || strcmp(ext,"csv")==0)
+            //if (strcmp(ext,"pdf")==0 || strcmp(ext,"rar")==0 || strcmp(ext,"docx")==0 || strcmp(ext,"doc")==0 || strcmp(ext,"csv")==0 || strcmp(ext,"mp4")==0)
             {
                 char content[32]="application/";
 
