@@ -101,6 +101,7 @@ struct setting {
     int mode;
     int save_new;
     int max_size;
+    int video_max_size;
     char img_path[512];
     char beansdb_ip[128];
     int beansdb_port;

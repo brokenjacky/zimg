@@ -329,6 +329,11 @@ static int load_conf(const char *conf) {
         settings.max_size = (int)lua_tonumber(L, -1);
     lua_pop(L, 1);
 
+    lua_getglobal(L,"video_max_size");
+    if (lua_isnumber(L,-1))
+        settings.max_size = (int)lua_tonumber(L,-1);
+    lua_pop(L,1);
+
     lua_getglobal(L, "img_path");
     if (lua_isstring(L, -1))
         str_lcpy(settings.img_path, lua_tostring(L, -1), sizeof(settings.img_path));

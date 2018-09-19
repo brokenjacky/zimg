@@ -134,6 +134,7 @@ cache:
     result = 1;
 
 done:
+    save_timg(md5,thr_arg);
     return result;
 }
 
@@ -177,7 +178,36 @@ int new_img(const char *buff, const size_t len, const char *save_name) {
 done:
     if (fd != -1)
         close(fd);
+
     return result;
+}
+
+void save_timg(char * md5,thr_arg_t *thr_arg) {
+    zimg_req_t *zimg_req = NULL;
+    zimg_req = (zimg_req_t *)malloc(sizeof(zimg_req_t));
+    if (zimg_req == NULL) {
+        LOG_PRINT(LOG_DEBUG, "zimg_req malloc failed!");
+        return;
+    }
+    zimg_req -> md5 = md5;
+    zimg_req -> type = NULL;
+    zimg_req -> width = 160;
+    zimg_req -> height = 0;
+    zimg_req -> proportion = 1;
+    zimg_req -> gray = 0;
+    zimg_req -> x = -1;
+    zimg_req -> y = -1;
+    zimg_req -> rotate = 0;
+    zimg_req -> quality = settings.quality;
+    zimg_req -> fmt = settings.format;
+    zimg_req -> sv = 0;
+    zimg_req -> thr_arg = thr_arg;
+
+    get_img(zimg_req,NULL);
+
+
+
+    free(zimg_req);
 }
 
 /**
@@ -368,12 +398,14 @@ int get_img(zimg_req_t *req, evhtp_request_t *request) {
     }
 
 done:
-    if (settings.etag == 1) {
-        result = zimg_etag_set(request, buff, len);
-        if (result == 2)
-            goto err;
+    if (request != NULL) {
+        if (settings.etag == 1) {
+            result = zimg_etag_set(request, buff, len);
+            if (result == 2)
+                goto err;
+        }
+        result = evbuffer_add(request->buffer_out, buff, len);
     }
-    result = evbuffer_add(request->buffer_out, buff, len);
     if (result != -1) {
         result = 1;
     }

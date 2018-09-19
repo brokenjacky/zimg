@@ -694,18 +694,29 @@ void post_request_cb(evhtp_request_t *req, void *arg) {
         err_no = 5;
         goto err;
     }
-    if (post_size > settings.max_size) {
-        LOG_PRINT(LOG_DEBUG, "Image Size Too Large!");
-        LOG_PRINT(LOG_ERROR, "%s fail post large", address);
-        err_no = 7;
-        goto err;
-    }
     const char *content_type = evhtp_header_find(req->headers_in, "Content-Type");
     if (!content_type) {
         LOG_PRINT(LOG_DEBUG, "Get Content-Type error!");
         LOG_PRINT(LOG_ERROR, "%s fail post content-type", address);
         err_no = 6;
         goto err;
+    }
+
+    if (strcmp("mp4",content_type)!=0){
+        if (post_size > settings.max_size) {
+            LOG_PRINT(LOG_DEBUG, "Image Size Too Large! %s",content_type);
+            LOG_PRINT(LOG_ERROR, "%s fail post large", address);
+            err_no = 7;
+            goto err;
+        }
+    }
+    else {
+        if (post_size > settings.video_max_size) {
+            LOG_PRINT(LOG_DEBUG, "File Size Too Large! %s",content_type);
+            LOG_PRINT(LOG_ERROR, "%s fail post large", address);
+            err_no = 7;
+            goto err;
+        }
     }
     evbuf_t *buf;
     buf = req->buffer_in;
@@ -834,13 +845,13 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
         struct stat st;
         if ((fd = open(settings.root_path, O_RDONLY)) == -1) {
             LOG_PRINT(LOG_DEBUG, "Root_page Open Failed. Return Default Page.");
-            evbuffer_add_printf(req->buffer_out, "<html>\n<body>\n<h1>\nWelcome To zimg World!</h1>\n</body>\n</html>\n");
+            //evbuffer_add_printf(req->buffer_out, "<html>\n<body>\n<h1>\nWelcome To zimg World!</h1>\n</body>\n</html>\n");
         } else {
             if (fstat(fd, &st) < 0) {
                 /* Make sure the length still matches, now that we
                  * opened the file :/ */
                 LOG_PRINT(LOG_DEBUG, "Root_page Length fstat Failed. Return Default Page.");
-                evbuffer_add_printf(req->buffer_out, "<html>\n<body>\n<h1>\nWelcome To zimg World!</h1>\n</body>\n</html>\n");
+             //   evbuffer_add_printf(req->buffer_out, "<html>\n<body>\n<h1>\nWelcome To zimg World!</h1>\n</body>\n</html>\n");
             } else {
                 evbuffer_add_file(req->buffer_out, fd, 0, st.st_size);
             }
