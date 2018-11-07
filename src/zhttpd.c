@@ -1032,6 +1032,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
     evhtp_headers_add_header(req->headers_out, evhtp_header_new("Server", settings.server_name, 0, 1));
     if(filename)
     {
+        LOG_PRINT(LOG_DEBUG,"file:%s",filename);
         char * ext = strstr(filename,".");
         if(ext)
         {
@@ -1047,7 +1048,7 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
 
             if(strcmp(ext,"pdf")!=0)
             {
-                char temp[80]="attachment;filename=";
+                char temp[512]="attachment;filename=";
                 strcat(temp,filename);
                 evhtp_headers_add_header(req->headers_out,evhtp_header_new("content-disposition",temp,0,0));
             }
