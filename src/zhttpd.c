@@ -39,6 +39,7 @@ typedef struct {
     int partno;
     int succno;
     int check_name;
+    char * filename;
 } mp_arg_t;
 
 int zimg_etag_set(evhtp_request_t *request, char *buff, size_t len);
@@ -428,6 +429,11 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
                     }
                 }
             }
+
+            int n = strlen(filename);
+            char *name = (char *)malloc(n+1);
+            strncpy(name,filename,n+1);
+            mp_arg->filename = name;
         }
         if (filename[0] != '\0' && mp_arg->check_name == -1) {
             LOG_PRINT(LOG_ERROR, "%s fail post type", mp_arg->address);
@@ -457,8 +463,7 @@ int on_chunk_data(multipart_parser* p, const char *at, size_t length) {
     if (length < 1)
         return 0;
     //multipart_parser_set_data(p, mp_arg);
-    char md5sum[33];
-    if (save_img(mp_arg->thr_arg, at, length, md5sum) == -1) {
+    if (save_img(mp_arg->thr_arg, at, length, mp_arg->filename) == -1) {
         LOG_PRINT(LOG_DEBUG, "Image Save Failed!");
         LOG_PRINT(LOG_ERROR, "%s fail post save", mp_arg->address);
         evbuffer_add_printf(mp_arg->req->buffer_out,
@@ -467,7 +472,7 @@ int on_chunk_data(multipart_parser* p, const char *at, size_t length) {
                            );
     } else {
         mp_arg->succno++;
-        LOG_PRINT(LOG_INFO, "%s succ post pic:%s size:%d", mp_arg->address, md5sum, length);
+        LOG_PRINT(LOG_INFO, "%s succ post pic:%s size:%d", mp_arg->address, mp_arg->filename, length);
 /*        evbuffer_add_printf(mp_arg->req->buffer_out,
                             "<h1>MD5: %s</h1>\n"
                             "Image upload successfully! You can get this image via this address:<br/><br/>\n"
@@ -475,7 +480,10 @@ int on_chunk_data(multipart_parser* p, const char *at, size_t length) {
                             md5sum, md5sum, settings.host,settings.port, md5sum
                            );
 */
-        evbuffer_add_printf(mp_arg->req->buffer_out,"{\"url\":\"%s/%s\"}",settings.host,md5sum);
+        time_t t = time(NULL);
+        struct tm *tt = localtime(&t);
+        int date = (tt->tm_year+1900)*10000 + (tt->tm_mon+1)*100 + tt->tm_mday;
+        evbuffer_add_printf(mp_arg->req->buffer_out,"{\"url\":\"%s/%d/%s\"}",settings.host,date,mp_arg->filename);
     }
     return 0;
 }
@@ -624,6 +632,8 @@ int multipart_parse(evhtp_request_t *req, const char *content_type, const char *
     err_no = -1;
 
 done:
+    if(mp_arg->filename)
+        free(mp_arg->filename);
     free(boundaryPattern);
     free(mp_arg);
     return err_no;

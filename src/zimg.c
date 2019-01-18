@@ -62,20 +62,7 @@ int save_img(thr_arg_t *thr_arg, const char *buff, const int len, char *md5) {
     char md5sum[33];
     int i;
     int h, l;
-    md5_init(&mdctx);
-    md5_append(&mdctx, (const unsigned char*)(buff), len);
-    md5_finish(&mdctx, md_value);
 
-    for (i = 0; i < 16; ++i) {
-        h = md_value[i] & 0xf0;
-        h >>= 4;
-        l = md_value[i] & 0x0f;
-        md5sum[i * 2] = (char)((h >= 0x0 && h <= 0x9) ? (h + 0x30) : (h + 0x57));
-        md5sum[i * 2 + 1] = (char)((l >= 0x0 && l <= 0x9) ? (l + 0x30) : (l + 0x57));
-    }
-    md5sum[32] = '\0';
-    str_lcpy(md5, md5sum, 33);
-    LOG_PRINT(LOG_DEBUG, "md5: %s", md5sum);
 
     char save_path[512];
     char save_name[512];
@@ -100,10 +87,11 @@ int save_img(thr_arg_t *thr_arg, const char *buff, const int len, char *md5) {
     }
 
     //caculate 2-level path
-    int lvl1 = str_hash(md5sum);
-    int lvl2 = str_hash(md5sum + 3);
+    time_t t = time(NULL);
+    struct tm *tt = localtime(&t);
+    int lvl1 = (tt->tm_year+1900)*10000 + (tt->tm_mon+1)*100 + tt->tm_mday;
 
-    snprintf(save_path, 512, "%s/%d/%d/%s", settings.img_path, lvl1, lvl2, md5sum);
+    snprintf(save_path, 512, "%s/%d", settings.img_path, lvl1);
     LOG_PRINT(LOG_DEBUG, "save_path: %s", save_path);
 
     if (is_dir(save_path) != 1) {
@@ -114,7 +102,7 @@ int save_img(thr_arg_t *thr_arg, const char *buff, const int len, char *md5) {
         LOG_PRINT(LOG_DEBUG, "save_path[%s] Create Finish.", save_path);
     }
 
-    snprintf(save_name, 512, "%s/0*0", save_path);
+    snprintf(save_name, 512, "%s/%s",save_path, md5);
     LOG_PRINT(LOG_DEBUG, "save_name-->: %s", save_name);
 
     if (is_file(save_name) == 1) {
@@ -134,7 +122,7 @@ cache:
     result = 1;
 
 done:
-    save_timg(md5,thr_arg);
+    //save_timg(md5,thr_arg);
     return result;
 }
 
