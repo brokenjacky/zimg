@@ -127,14 +127,15 @@ static void settings_init(void) {
     settings.mode = 1;
     settings.save_new = 1;
     settings.max_size = 10485760;
-    str_lcpy(settings.img_path, "./img", sizeof(settings.img_path));
+    str_lcpy(settings.img_path, "./newimg", sizeof(settings.img_path));
+	str_lcpy(settings.old_path, "./img", sizeof(settings.old_path));
     str_lcpy(settings.beansdb_ip, "127.0.0.1", sizeof(settings.beansdb_ip));
     settings.beansdb_port = 7905;
     str_lcpy(settings.ssdb_ip, "127.0.0.1", sizeof(settings.ssdb_ip));
     settings.ssdb_port = 6379;
     multipart_parser_settings *callbacks = (multipart_parser_settings *)malloc(sizeof(multipart_parser_settings));
     memset(callbacks, 0, sizeof(multipart_parser_settings));
-    //callbacks->on_header_field = on_header_field;
+    callbacks->on_header_field = on_header_field;
     callbacks->on_header_value = on_header_value;
     callbacks->on_chunk_data = on_chunk_data;
     settings.mp_set = callbacks;
@@ -333,6 +334,11 @@ static int load_conf(const char *conf) {
     if (lua_isstring(L, -1))
         str_lcpy(settings.img_path, lua_tostring(L, -1), sizeof(settings.img_path));
     lua_pop(L, 1);
+
+	lua_getglobal(L, "old_path");
+	if (lua_isstring(L, -1))
+		str_lcpy(settings.old_path, lua_tostring(L, -1), sizeof(settings.old_path));
+	lua_pop(L, 1);
 
     lua_getglobal(L, "beansdb_ip");
     if (lua_isstring(L, -1))
@@ -611,7 +617,7 @@ int main(int argc, char **argv) {
     //evhtp_set_cb(htp, "/admin", admin_request_cb, NULL);
     //evhtp_set_cb(htp, "/info", info_request_cb, NULL);
     //evhtp_set_cb(htp, "/echo", echo_cb, NULL);
-    //evhtp_set_gencb(htp, get_request_cb, NULL);
+    evhtp_set_gencb(htp, get_request_cb, NULL);
 #ifndef EVHTP_DISABLE_EVTHR
     evhtp_use_threads(htp, init_thread, settings.num_threads, NULL);
 #endif

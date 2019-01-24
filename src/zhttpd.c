@@ -39,7 +39,10 @@ typedef struct {
     int partno;
     int succno;
     int check_name;
+	int flag;		// 1 filepath is ready
     char * filename;
+	char * filepath;
+
 } mp_arg_t;
 
 int zimg_etag_set(evhtp_request_t *request, char *buff, size_t len);
@@ -396,9 +399,16 @@ void echo_cb(evhtp_request_t *req, void *arg) {
 }
 
 int on_header_field(multipart_parser* p, const char *at, size_t length) {
+	
     char *header_name = (char *)malloc(length + 1);
     snprintf(header_name, length + 1, "%s", at);
     LOG_PRINT(LOG_DEBUG, "header_name %d %s: ", length, header_name);
+	if (strncmp(header_name,"filepath",length)==0)
+	{
+		LOG_PRINT(LOG_DEBUG, "set filepath flag...");
+		mp_arg_t *mp_arg = (mp_arg_t *)multipart_parser_get_data(p);
+		mp_arg->flag |= 1;
+	}
     free(header_name);
     return 0;
 }
@@ -449,6 +459,16 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
     char *header_value = (char *)malloc(length + 1);
     snprintf(header_value, length + 1, "%s", at);
     LOG_PRINT(LOG_DEBUG, "header_value %d %s", length, header_value);
+
+	if ((mp_arg->flag&1) != 0)
+	{
+		mp_arg->flag = 0;
+		char *path = (char *)malloc(length + 1);
+		strncpy(path, header_value, length + 1);
+		mp_arg->filepath = path;
+		LOG_PRINT(LOG_DEBUG, "filepath %s", mp_arg->filepath);
+
+	}
     free(header_value);
     return 0;
 }
@@ -463,7 +483,7 @@ int on_chunk_data(multipart_parser* p, const char *at, size_t length) {
     if (length < 1)
         return 0;
     //multipart_parser_set_data(p, mp_arg);
-    if (save_img(mp_arg->thr_arg, at, length, mp_arg->filename) == -1) {
+    if (save_img(mp_arg, at, length, mp_arg->filename) == -1) {
         LOG_PRINT(LOG_DEBUG, "Image Save Failed!");
         LOG_PRINT(LOG_ERROR, "%s fail post save", mp_arg->address);
         evbuffer_add_printf(mp_arg->req->buffer_out,
@@ -483,7 +503,14 @@ int on_chunk_data(multipart_parser* p, const char *at, size_t length) {
         time_t t = time(NULL);
         struct tm *tt = localtime(&t);
         int date = (tt->tm_year+1900)*10000 + (tt->tm_mon+1)*100 + tt->tm_mday;
-        evbuffer_add_printf(mp_arg->req->buffer_out,"{\"url\":\"%s/%d/%s\"}",settings.host,date,mp_arg->filename);
+		if (mp_arg->filepath)
+		{
+			evbuffer_add_printf(mp_arg->req->buffer_out, "{\"url\":\"%s/%s/%s\"}", settings.host, mp_arg->filepath, mp_arg->filename);
+		}
+		else {
+			evbuffer_add_printf(mp_arg->req->buffer_out, "{\"url\":\"%s/%d/%s\"}", settings.host, date, mp_arg->filename);
+		}
+        
     }
     return 0;
 }
@@ -634,6 +661,10 @@ int multipart_parse(evhtp_request_t *req, const char *content_type, const char *
 done:
     if(mp_arg->filename)
         free(mp_arg->filename);
+	if (mp_arg->filepath)
+	{
+		free(mp_arg->filepath);
+	}
     free(boundaryPattern);
     free(mp_arg);
     return err_no;
