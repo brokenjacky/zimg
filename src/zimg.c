@@ -46,6 +46,7 @@ typedef struct {
 	int flag;		// 1 filepath is ready
 	char * filename;
 	char * filepath;
+	int width;
 
 } mp_arg_t;
 
@@ -83,7 +84,7 @@ int is_timg(const char *filename) {
 int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
     int result = -1;
 
-    LOG_PRINT(LOG_DEBUG, "Begin to Caculate MD5...");
+    LOG_PRINT(LOG_DEBUG, "Begin to Caculate MD5...%d",p->width);
    // md5_state_t mdctx;
     //md5_byte_t md_value[16];
     char md5sum[33];
@@ -116,7 +117,7 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
     int lvl1 = (tt->tm_year+1900)*10000 + (tt->tm_mon+1)*100 + tt->tm_mday;
 
 	int isTimg = is_timg(p->filename);
-	if (isTimg<0)
+	if (isTimg<0)	// 非图片
 	{
 		if (p->filepath)
 		{
@@ -163,11 +164,12 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
     }
 
 done:
-	if (isTimg)
+	if (isTimg>0)
 	{
 		snprintf(save_path, 512, "%s/%s", settings.img_path, p->filepath);
 		save_timg(save_path, p);
 	}
+	result = 1;
     return result;
 }
 
@@ -238,10 +240,12 @@ void save_timg(char * filePath, mp_arg_t *p) {
 
     get_timg(zimg_req,p);
 
-	zimg_req->width = 160;
-	get_timg(zimg_req, p);
-
-
+	if (p->width>0 && p->width<5000)
+	{
+		//LOG_PRINT(LOG_DEBUG, "zimg_req width %d",p->width);
+		zimg_req->width = p->width;
+		get_timg(zimg_req, p);
+	}
 
     free(zimg_req);
 }

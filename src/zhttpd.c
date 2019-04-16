@@ -42,6 +42,7 @@ typedef struct {
 	int flag;		// 1 filepath is ready
     char * filename;
 	char * filepath;
+	int width;
 
 } mp_arg_t;
 
@@ -409,6 +410,13 @@ int on_header_field(multipart_parser* p, const char *at, size_t length) {
 		mp_arg_t *mp_arg = (mp_arg_t *)multipart_parser_get_data(p);
 		mp_arg->flag |= 1;
 	}
+
+	if (strncmp(header_name, "width", length) == 0)
+	{
+		LOG_PRINT(LOG_DEBUG, "set width flag...");
+		mp_arg_t *mp_arg = (mp_arg_t *)multipart_parser_get_data(p);
+		mp_arg->flag |= 2;
+	}
     free(header_name);
     return 0;
 }
@@ -467,6 +475,16 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
 		strncpy(path, header_value, length + 1);
 		mp_arg->filepath = path;
 		LOG_PRINT(LOG_DEBUG, "filepath %s", mp_arg->filepath);
+
+	}
+
+	if ((mp_arg->flag & 2) != 0)
+	{
+		mp_arg->flag = 0;
+		char *path = (char *)malloc(length + 1);
+		strncpy(path, header_value, length + 1);
+		mp_arg->width = atoi(path);
+		LOG_PRINT(LOG_DEBUG, "width %d", mp_arg->width);
 
 	}
     free(header_value);
@@ -645,6 +663,9 @@ int multipart_parse(evhtp_request_t *req, const char *content_type, const char *
     mp_arg->partno = 0;
     mp_arg->succno = 0;
     mp_arg->check_name = 0;
+	mp_arg->filename = NULL;
+	mp_arg->filepath = NULL;
+	mp_arg->width = 0;
     multipart_parser_set_data(parser, mp_arg);
     multipart_parser_execute(parser, buff, post_size);
     multipart_parser_free(parser);
