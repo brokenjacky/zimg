@@ -31,6 +31,7 @@
 #include "zdb.h"
 #include "zaccess.h"
 #include "cjson/cJSON.h"
+#include "decodequery.h"
 
 typedef struct {
     evhtp_request_t *req;
@@ -1032,7 +1033,10 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
     evhtp_headers_add_header(req->headers_out, evhtp_header_new("Server", settings.server_name, 0, 1));
     if(filename)
     {
+        char decodeName[256];
+        decodeUrl(decodeName,filename);
         LOG_PRINT(LOG_DEBUG,"file:%s",filename);
+        LOG_PRINT(LOG_DEBUG,"file1:%s",decodeName);
         char * ext = strstr(filename,".");
         if(ext)
         {
@@ -1046,10 +1050,13 @@ void get_request_cb(evhtp_request_t *req, void *arg) {
 
             }
 
-            if(strcmp(ext,"pdf")!=0)
+           // if(strcmp(ext,"pdf")!=0)
             {
-                char temp[512]="attachment;filename=";
-                strcat(temp,filename);
+                //char temp[512]="attachment;filename='测试.docx'";
+                //char temp[512]="attachment;filename=";
+                char temp[512];
+                //strcat(temp,decodeName);
+                sprintf(temp,"attachment;filename=%s",decodeName);
                 evhtp_headers_add_header(req->headers_out,evhtp_header_new("content-disposition",temp,0,0));
             }
         }
