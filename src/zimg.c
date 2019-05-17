@@ -166,7 +166,15 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
 done:
 	if (isTimg>0)
 	{
-		snprintf(save_path, 512, "%s/%s", settings.img_path, p->filepath);
+		if (p->filepath)
+		{
+			snprintf(save_path, 512, "%s/%s", settings.img_path, p->filepath);
+		}
+		else {
+			snprintf(save_path, 512, "%s/%d", settings.img_path, lvl1);
+		}
+		
+		LOG_PRINT(LOG_DEBUG, "save_path[%s]",save_path);
 		save_timg(save_path, p);
 	}
 	result = 1;
