@@ -66,7 +66,7 @@ int is_timg(const char *filename) {
 		if (strcmp(ext,"jpeg")==0 || strcmp(ext,"jpg")==0 || strcmp(ext,"png")==0 || strcmp(ext,"webp")==0)
 		{
 			return 1;
-		}	
+		}
 	}
 	return -1;
 }
@@ -126,7 +126,7 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
 		else {
 			snprintf(save_path, 512, "%s/%d", settings.img_path, lvl1);
 		}
-	} 
+	}
 	else {
 		if (p->filepath)
 		{
@@ -136,8 +136,8 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
 			snprintf(save_path, 512, "%s/%d/src", settings.img_path, lvl1);
 		}
 	}
-	
-    
+
+
     LOG_PRINT(LOG_DEBUG, "save_path: %s", save_path);
 
     if (is_dir(save_path) != 1) {
@@ -151,12 +151,47 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
     snprintf(save_name, 512, "%s/%s",save_path, md5);
     LOG_PRINT(LOG_DEBUG, "save_name-->: %s", save_name);
 
-	/*
-    if (is_file(save_name) == 1) {
+
+    if (p->filepath==NULL &&is_file(save_name) == 1) {
+         char * ext = strstr(md5,".");
         LOG_PRINT(LOG_DEBUG, "Check File Exist. Needn't Save.");
-        goto cache;
+        LOG_PRINT(LOG_DEBUG, "Begin to Caculate MD5...");
+        md5_state_t mdctx;
+        md5_byte_t md_value[16];
+        char md5sum[33];
+        int i;
+        int h, l;
+        md5_init(&mdctx);
+        md5_append(&mdctx, (const unsigned char*)(buff), len);
+        md5_finish(&mdctx, md_value);
+
+        for (i = 0; i < 16; ++i) {
+            h = md_value[i] & 0xf0;
+            h >>= 4;
+            l = md_value[i] & 0x0f;
+            md5sum[i * 2] = (char)((h >= 0x0 && h <= 0x9) ? (h + 0x30) : (h + 0x57));
+            md5sum[i * 2 + 1] = (char)((l >= 0x0 && l <= 0x9) ? (l + 0x30) : (l + 0x57));
+        }
+        md5sum[32] = '\0';
+        LOG_PRINT(LOG_DEBUG, "md5: %s", md5sum);
+
+        char newFileName[64];
+        if(ext)
+        {
+            snprintf(newFileName,64,"%s%s",md5sum,ext);
+        }else {
+         snprintf(newFileName,64,"%s",md5sum);
+        }
+        snprintf(save_name, 512, "%s/%s",save_path, newFileName);
+
+        int n = strlen(newFileName);
+        char *name = (char *)malloc(n+1);
+        strncpy(name,newFileName,n+1);
+        if(p->filename) {
+            free(p->filename);
+        }
+        p->filename = name;
     }
-	*/
 
     if (new_img(buff, len, save_name) == -1) {
         LOG_PRINT(LOG_DEBUG, "Save Image[%s] Failed!", save_name);
@@ -173,7 +208,7 @@ done:
 		else {
 			snprintf(save_path, 512, "%s/%d", settings.img_path, lvl1);
 		}
-		
+
 		LOG_PRINT(LOG_DEBUG, "save_path[%s]",save_path);
 		save_timg(save_path, p);
 	}
@@ -301,14 +336,14 @@ int get_timg(zimg_req_t *req, mp_arg_t *p) {
 		snprintf(rsp_path, 512, "%s/%d/%s", req->md5, req->width,p->filename);
 		LOG_PRINT(LOG_DEBUG, "Got the rsp_path: %s", rsp_path);
 	}
-	
 
-	if ((fd = open(rsp_path, O_RDONLY)) == -1) {
+
+	//if ((fd = open(rsp_path, O_RDONLY)) == -1) {
 		im = NewMagickWand();
 		if (im == NULL) goto err;
 
 		int ret;
-	
+
 		ret = MagickReadImage(im, orig_path);
 		if (ret != MagickTrue) {
 			LOG_PRINT(LOG_DEBUG, "Open Original Image From Disk Failed! %d != %d", ret, MagickTrue);
@@ -329,7 +364,7 @@ int get_timg(zimg_req_t *req, mp_arg_t *p) {
 				free(new_buff);
 			}
 		}
-		
+
 		if (settings.script_on == 1 && req->type != NULL)
 			ret = lua_convert(im, req);
 		else
@@ -342,7 +377,8 @@ int get_timg(zimg_req_t *req, mp_arg_t *p) {
 			LOG_PRINT(LOG_DEBUG, "Webimg Get Blob Failed!");
 			goto err;
 		}
-	}
+	//}
+    /*
 	else {
 		to_save = false;
 		fstat(fd, &f_stat);
@@ -367,6 +403,7 @@ int get_timg(zimg_req_t *req, mp_arg_t *p) {
 		}
 	}
 
+    */
 	//LOG_PRINT(LOG_INFO, "New Image[%s]", rsp_path);
 	int save_new = 0;
 	if (to_save == true) {
