@@ -501,6 +501,10 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
 				*s = '\0';
 			}
 			RemovePunc(str, strlen(str));
+            if(strlen(str)==0)
+            {
+                strcpy(str,"zimg");
+            }
             memset(name,0,n);
 			snprintf(name,n+1 ,"%s.%s", str, fileType);
 			LOG_PRINT(LOG_DEBUG, "str[%s] type[%s] name[%s]",str, fileType,name);
