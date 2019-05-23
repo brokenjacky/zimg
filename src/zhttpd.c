@@ -400,7 +400,7 @@ void echo_cb(evhtp_request_t *req, void *arg) {
 }
 
 int on_header_field(multipart_parser* p, const char *at, size_t length) {
-	
+
     char *header_name = (char *)malloc(length + 1);
     snprintf(header_name, length + 1, "%s", at);
     LOG_PRINT(LOG_DEBUG, "header_name %d %s: ", length, header_name);
@@ -408,17 +408,59 @@ int on_header_field(multipart_parser* p, const char *at, size_t length) {
 	{
 		LOG_PRINT(LOG_DEBUG, "set filepath flag...");
 		mp_arg_t *mp_arg = (mp_arg_t *)multipart_parser_get_data(p);
-		mp_arg->flag |= 1;
+		mp_arg->flag = 1;
 	}
 
 	if (strncmp(header_name, "width", length) == 0)
 	{
 		LOG_PRINT(LOG_DEBUG, "set width flag...");
 		mp_arg_t *mp_arg = (mp_arg_t *)multipart_parser_get_data(p);
-		mp_arg->flag |= 2;
+		mp_arg->flag = 2;
 	}
     free(header_name);
     return 0;
+}
+
+bool banjiao(char c) {
+	const char sign[] = { ",.!?/'\"<>\\:;@#" };//半角的符号，自己可以添加
+	for (int i = 0; sign[i]; i++)
+		if (sign[i] == c) return true;
+	return false;
+}
+bool quanjiao(char *c) { //两位
+	const char sign[] = { "，，。！？、；：“”‘’》" };//全角的符号，自己可以添加
+	for (int i = 0; sign[i]; i += 3) //i+=2
+		if (sign[i] == c[0] && sign[i + 1] == c[1] && sign[i+2]==c[2])return true;
+	return false;
+}
+
+void RemovePunc(char *word, int len)
+{
+	char result[512] = { 0 };
+	int index = 0;
+	for (int i = 0; i < len; i++)
+	{
+		if (word[i] > 0)
+		{
+			if (!banjiao(*(word + i)))
+			{
+				result[index++] = *(word + i);
+			}
+		}
+		else
+		{
+			if (!quanjiao(word + i))
+			{
+				result[index++] = *(word + i);
+				result[index++] = *(word + i + 1);
+				result[index++] = *(word + i + 2);
+			}
+			i++;
+			i++;
+		}
+	}
+    memset(word,0,len);
+	strcpy(word,result);
 }
 
 int on_header_value(multipart_parser* p, const char *at, size_t length) {
@@ -426,6 +468,7 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
     char *filename = strnstr(at, "filename=", length);
     char *nameend = NULL;
     if (filename) {
+		char fileType[32]={0};
         filename += 9;
         if (filename[0] == '\"') {
             filename++;
@@ -434,7 +477,6 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
                 mp_arg->check_name = -1;
             else {
                 nameend[0] = '\0';
-                char fileType[32];
                 LOG_PRINT(LOG_DEBUG, "File[%s]", filename);
                 if (get_type(filename, fileType) == -1) {
                     LOG_PRINT(LOG_DEBUG, "Get Type of File[%s] Failed!", filename);
@@ -450,7 +492,18 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
 
             int n = strlen(filename);
             char *name = (char *)malloc(n+1);
-            strncpy(name,filename,n+1);
+
+			char str[256] = { 0 };
+			strncpy(str, filename, n + 1);
+			char * s = strrchr(str, '.');
+			if (s != NULL)
+			{
+				*s = '\0';
+			}
+			RemovePunc(str, strlen(str));
+            memset(name,0,n);
+			snprintf(name,n+1 ,"%s.%s", str, fileType);
+			LOG_PRINT(LOG_DEBUG, "str[%s] type[%s] name[%s]",str, fileType,name);
             mp_arg->filename = name;
         }
         if (filename[0] != '\0' && mp_arg->check_name == -1) {
@@ -468,7 +521,7 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
     snprintf(header_value, length + 1, "%s", at);
     LOG_PRINT(LOG_DEBUG, "header_value %d %s", length, header_value);
 
-	if ((mp_arg->flag&1) != 0)
+	if (mp_arg->flag == 1)
 	{
 		mp_arg->flag = 0;
 		char *path = (char *)malloc(length + 1);
@@ -478,7 +531,7 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
 
 	}
 
-	if ((mp_arg->flag & 2) != 0)
+	if (mp_arg->flag == 2)
 	{
 		mp_arg->flag = 0;
 		char *path = (char *)malloc(length + 1);
@@ -528,7 +581,7 @@ int on_chunk_data(multipart_parser* p, const char *at, size_t length) {
 		else {
 			evbuffer_add_printf(mp_arg->req->buffer_out, "{\"url\":\"%s/%d/%s\"}", settings.host, date, mp_arg->filename);
 		}
-        
+
     }
     return 0;
 }

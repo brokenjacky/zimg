@@ -154,7 +154,6 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
 
     if (p->filepath==NULL &&is_file(save_name) == 1) {
          char * ext = strstr(md5,".");
-        LOG_PRINT(LOG_DEBUG, "Check File Exist. Needn't Save.");
         LOG_PRINT(LOG_DEBUG, "Begin to Caculate MD5...");
         md5_state_t mdctx;
         md5_byte_t md_value[16];
