@@ -116,6 +116,11 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
     struct tm *tt = localtime(&t);
     int lvl1 = (tt->tm_year+1900)*10000 + (tt->tm_mon+1)*100 + tt->tm_mday;
 
+    if(!p->filename)
+    {
+        LOG_PRINT(LOG_DEBUG, "filename is null");
+        goto err;
+    }
 	int isTimg = is_timg(p->filename);
 	if (isTimg<0)	// 非图片
 	{
@@ -213,6 +218,9 @@ done:
 	}
 	result = 1;
     return result;
+err:
+	result = -1;
+	return result;
 }
 
 /**

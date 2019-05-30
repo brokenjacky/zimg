@@ -472,44 +472,49 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
         filename += 9;
         if (filename[0] == '\"') {
             filename++;
-            nameend = strnchr(filename, '\"', length - (filename - at));
-            if (!nameend)
+        }
+        nameend = strnchr(filename, '\"', length - (filename - at));
+        if(!nameend)
+        {
+            nameend = strnchr(filename, '\;', length - (filename - at));
+        }
+        if (!nameend)
+           mp_arg->check_name = -1;
+         else {
+            nameend[0] = '\0';
+            LOG_PRINT(LOG_DEBUG, "File[%s]", filename);
+            if (get_type(filename, fileType) == -1) {
+                LOG_PRINT(LOG_DEBUG, "Get Type of File[%s] Failed!", filename);
                 mp_arg->check_name = -1;
-            else {
-                nameend[0] = '\0';
-                LOG_PRINT(LOG_DEBUG, "File[%s]", filename);
-                if (get_type(filename, fileType) == -1) {
-                    LOG_PRINT(LOG_DEBUG, "Get Type of File[%s] Failed!", filename);
+            } else {
+                LOG_PRINT(LOG_DEBUG, "fileType[%s]", fileType);
+                if (is_img(fileType) != 1) {
+                    LOG_PRINT(LOG_DEBUG, "fileType[%s] is Not Supported!", fileType);
                     mp_arg->check_name = -1;
-                } else {
-                    LOG_PRINT(LOG_DEBUG, "fileType[%s]", fileType);
-                    if (is_img(fileType) != 1) {
-                        LOG_PRINT(LOG_DEBUG, "fileType[%s] is Not Supported!", fileType);
-                        mp_arg->check_name = -1;
-                    }
                 }
             }
-
-            int n = strlen(filename);
-            char *name = (char *)malloc(n+1);
-
-			char str[256] = { 0 };
-			strncpy(str, filename, n + 1);
-			char * s = strrchr(str, '.');
-			if (s != NULL)
-			{
-				*s = '\0';
-			}
-			RemovePunc(str, strlen(str));
-            if(strlen(str)==0)
-            {
-                strcpy(str,"zimg");
-            }
-            memset(name,0,n);
-			snprintf(name,n+1 ,"%s.%s", str, fileType);
-			LOG_PRINT(LOG_DEBUG, "str[%s] type[%s] name[%s]",str, fileType,name);
-            mp_arg->filename = name;
         }
+
+        int n = strlen(filename);
+        char *name = (char *)malloc(n+1);
+
+		char str[256] = { 0 };
+		strncpy(str, filename, n + 1);
+		char * s = strrchr(str, '.');
+		if (s != NULL)
+		{
+			*s = '\0';
+		}
+		RemovePunc(str, strlen(str));
+        if(strlen(str)==0)
+        {
+            strcpy(str,"zimg");
+        }
+        memset(name,0,n);
+		snprintf(name,n+1 ,"%s.%s", str, fileType);
+		LOG_PRINT(LOG_DEBUG, "str[%s] type[%s] name[%s]",str, fileType,name);
+        mp_arg->filename = name;
+
         if (filename[0] != '\0' && mp_arg->check_name == -1) {
             LOG_PRINT(LOG_ERROR, "%s fail post type", mp_arg->address);
          /*   evbuffer_add_printf(mp_arg->req->buffer_out,
@@ -519,6 +524,15 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
                                );
         */
         }
+    }
+    else
+    {
+        LOG_PRINT(LOG_DEBUG, "filename is null at[%s] length[%d]",at,length);
+    }
+
+    if(!mp_arg->filename)
+    {
+        mp_arg->check_name = -1;
     }
     //multipart_parser_set_data(p, mp_arg);
     char *header_value = (char *)malloc(length + 1);
