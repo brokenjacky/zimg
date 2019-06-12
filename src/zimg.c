@@ -43,14 +43,10 @@ typedef struct {
 	int partno;
 	int succno;
 	int check_name;
-	int flag;		// 1 filepath is ready
 	char * filename;
-	char * filepath;
-	int width;
-
 } mp_arg_t;
 
-int save_img(mp_arg_t *p, const char *buff, const int len, char *md5);
+int save_img(mp_arg_t *p, const char *buff, const int len, char *fileurl);
 int new_img(const char *buff, const size_t len, const char *save_name);
 int get_img(zimg_req_t *req, evhtp_request_t *request);
 int admin_img(evhtp_request_t *req, thr_arg_t *thr_arg, char *md5, int t);
@@ -81,17 +77,16 @@ int is_timg(const char *filename) {
  *
  * @return 1 for success and -1 for fail
  */
-int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
+int save_img(mp_arg_t *p, const char *buff, const int len, char *fileurl) {
     int result = -1;
 
-    LOG_PRINT(LOG_DEBUG, "Begin to Caculate MD5...%d",p->width);
+    LOG_PRINT(LOG_DEBUG, "Begin to Caculate MD5...");
    // md5_state_t mdctx;
     //md5_byte_t md_value[16];
     char md5sum[33];
 
     char save_path[512];
     char save_name[512];
-
     if (settings.mode != 1) {
         if (exist_db(p->thr_arg, md5sum) == 1) {
             LOG_PRINT(LOG_DEBUG, "File Exist, Needn't Save.");
@@ -116,28 +111,46 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
     struct tm *tt = localtime(&t);
     int lvl1 = (tt->tm_year+1900)*10000 + (tt->tm_mon+1)*100 + tt->tm_mday;
 
+
+    evhtp_kvs_t *params;
+    params = p->req->uri->query;
+    char *filepath = NULL;
+    char newfilepath[512];
+    char filename[128];
+    if (params != NULL)
+    {
+        filepath = evhtp_kv_find(params, "filepath");
+    }
+
     if(!p->filename)
     {
         LOG_PRINT(LOG_DEBUG, "filename is null");
-        goto err;
+        goto done;
+    }else{
+        strncpy(filename,p->filename,128);
     }
+
 	int isTimg = is_timg(p->filename);
 	if (isTimg<0)	// 非图片
 	{
-		if (p->filepath)
+		if (filepath)
 		{
-			snprintf(save_path, 512, "%s/%s", settings.img_path, p->filepath);
+			snprintf(save_path, 512, "%s/%s", settings.img_path, filepath);
+            snprintf(fileurl,512,"%s/%s",filepath,filename);
 		}
 		else {
+            snprintf(fileurl,512,"%d/%s",lvl1,filename);
 			snprintf(save_path, 512, "%s/%d", settings.img_path, lvl1);
 		}
 	}
 	else {
-		if (p->filepath)
+		if (filepath)
 		{
-			snprintf(save_path, 512, "%s/%s/src", settings.img_path, p->filepath);
+            snprintf(fileurl,512,"%s/%s",filepath,filename);
+			snprintf(save_path, 512, "%s/%s/src", settings.img_path, filepath);
 		}
 		else {
+            snprintf(fileurl,512,"%d/%s",lvl1,filename);
 			snprintf(save_path, 512, "%s/%d/src", settings.img_path, lvl1);
 		}
 	}
@@ -153,12 +166,12 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
         LOG_PRINT(LOG_DEBUG, "save_path[%s] Create Finish.", save_path);
     }
 
-    snprintf(save_name, 512, "%s/%s",save_path, md5);
+    snprintf(save_name, 512, "%s/%s",save_path, p->filename);
     LOG_PRINT(LOG_DEBUG, "save_name-->: %s", save_name);
 
 
-    if (p->filepath==NULL &&is_file(save_name) == 1) {
-         char * ext = strstr(md5,".");
+    if (filepath==NULL &&is_file(save_name) == 1) {
+         char * ext = strstr(p->filename,".");
         LOG_PRINT(LOG_DEBUG, "Begin to Caculate MD5...");
         md5_state_t mdctx;
         md5_byte_t md_value[16];
@@ -205,9 +218,9 @@ int save_img(mp_arg_t *p, const char *buff, const int len, char *md5) {
 done:
 	if (isTimg>0)
 	{
-		if (p->filepath)
+		if (filepath)
 		{
-			snprintf(save_path, 512, "%s/%s", settings.img_path, p->filepath);
+			snprintf(save_path, 512, "%s/%s", settings.img_path, filepath);
 		}
 		else {
 			snprintf(save_path, 512, "%s/%d", settings.img_path, lvl1);
@@ -218,9 +231,6 @@ done:
 	}
 	result = 1;
     return result;
-err:
-	result = -1;
-	return result;
 }
 
 /**
@@ -290,10 +300,18 @@ void save_timg(char * filePath, mp_arg_t *p) {
 
     get_timg(zimg_req,p);
 
-	if (p->width>0 && p->width<5000)
+    evhtp_kvs_t *params = p->req->uri->query;
+    int width = 0;
+    if (params != NULL) {
+         const char *str_w = evhtp_kv_find(params, "width");
+         if (str_w!=NULL)
+            width = atoi(str_w);
+    }
+
+	if (width>0 && width<5000)
 	{
 		//LOG_PRINT(LOG_DEBUG, "zimg_req width %d",p->width);
-		zimg_req->width = p->width;
+		zimg_req->width = width;
 		get_timg(zimg_req, p);
 	}
 

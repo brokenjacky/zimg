@@ -39,11 +39,7 @@ typedef struct {
     int partno;
     int succno;
     int check_name;
-	int flag;		// 1 filepath is ready
     char * filename;
-	char * filepath;
-	int width;
-
 } mp_arg_t;
 
 int zimg_etag_set(evhtp_request_t *request, char *buff, size_t len);
@@ -404,19 +400,6 @@ int on_header_field(multipart_parser* p, const char *at, size_t length) {
     char *header_name = (char *)malloc(length + 1);
     snprintf(header_name, length + 1, "%s", at);
     LOG_PRINT(LOG_DEBUG, "header_name %d %s: ", length, header_name);
-	if (strncmp(header_name,"filepath",length)==0)
-	{
-		LOG_PRINT(LOG_DEBUG, "set filepath flag...");
-		mp_arg_t *mp_arg = (mp_arg_t *)multipart_parser_get_data(p);
-		mp_arg->flag = 1;
-	}
-
-	if (strncmp(header_name, "width", length) == 0)
-	{
-		LOG_PRINT(LOG_DEBUG, "set width flag...");
-		mp_arg_t *mp_arg = (mp_arg_t *)multipart_parser_get_data(p);
-		mp_arg->flag = 2;
-	}
     free(header_name);
     return 0;
 }
@@ -525,10 +508,6 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
         */
         }
     }
-    else
-    {
-        LOG_PRINT(LOG_DEBUG, "filename is null at[%s] length[%d]",at,length);
-    }
 
     if(!mp_arg->filename)
     {
@@ -538,26 +517,6 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
     char *header_value = (char *)malloc(length + 1);
     snprintf(header_value, length + 1, "%s", at);
     LOG_PRINT(LOG_DEBUG, "header_value %d %s", length, header_value);
-
-	if (mp_arg->flag == 1)
-	{
-		mp_arg->flag = 0;
-		char *path = (char *)malloc(length + 1);
-		strncpy(path, header_value, length + 1);
-		mp_arg->filepath = path;
-		LOG_PRINT(LOG_DEBUG, "filepath %s", mp_arg->filepath);
-
-	}
-
-	if (mp_arg->flag == 2)
-	{
-		mp_arg->flag = 0;
-		char *path = (char *)malloc(length + 1);
-		strncpy(path, header_value, length + 1);
-		mp_arg->width = atoi(path);
-		LOG_PRINT(LOG_DEBUG, "width %d", mp_arg->width);
-
-	}
     free(header_value);
     return 0;
 }
@@ -572,7 +531,9 @@ int on_chunk_data(multipart_parser* p, const char *at, size_t length) {
     if (length < 1)
         return 0;
     //multipart_parser_set_data(p, mp_arg);
-    if (save_img(mp_arg, at, length, mp_arg->filename) == -1) {
+
+    char fileurl[512];
+    if (save_img(mp_arg, at, length, fileurl) == -1) {
         LOG_PRINT(LOG_DEBUG, "Image Save Failed!");
         LOG_PRINT(LOG_ERROR, "%s fail post save", mp_arg->address);
         evbuffer_add_printf(mp_arg->req->buffer_out,
@@ -582,23 +543,7 @@ int on_chunk_data(multipart_parser* p, const char *at, size_t length) {
     } else {
         mp_arg->succno++;
         LOG_PRINT(LOG_INFO, "%s succ post pic:%s size:%d", mp_arg->address, mp_arg->filename, length);
-/*        evbuffer_add_printf(mp_arg->req->buffer_out,
-                            "<h1>MD5: %s</h1>\n"
-                            "Image upload successfully! You can get this image via this address:<br/><br/>\n"
-                            "<a href=\"/%s\">http://%s:%d/%s</a>?w=width&h=height&g=isgray&x=position_x&y=position_y&r=rotate&q=quality&f=format\n",
-                            md5sum, md5sum, settings.host,settings.port, md5sum
-                           );
-*/
-        time_t t = time(NULL);
-        struct tm *tt = localtime(&t);
-        int date = (tt->tm_year+1900)*10000 + (tt->tm_mon+1)*100 + tt->tm_mday;
-		if (mp_arg->filepath)
-		{
-			evbuffer_add_printf(mp_arg->req->buffer_out, "{\"url\":\"%s/%s/%s\"}", settings.host, mp_arg->filepath, mp_arg->filename);
-		}
-		else {
-			evbuffer_add_printf(mp_arg->req->buffer_out, "{\"url\":\"%s/%d/%s\"}", settings.host, date, mp_arg->filename);
-		}
+		evbuffer_add_printf(mp_arg->req->buffer_out, "{\"url\":\"%s/%s\"}", settings.host, fileurl);
 
     }
     return 0;
@@ -633,7 +578,8 @@ int json_return(evhtp_request_t *req, int err_no, const char *md5sum, int post_s
 }
 
 int binary_parse(evhtp_request_t *req, const char *content_type, const char *address, const char *buff, int post_size) {
-    int err_no = 0;
+    int err_no = -1;
+    return err_no;
     if (is_img(content_type) != 1) {
         LOG_PRINT(LOG_DEBUG, "fileType[%s] is Not Supported!", content_type);
         LOG_PRINT(LOG_ERROR, "%s fail post type", address);
@@ -735,8 +681,6 @@ int multipart_parse(evhtp_request_t *req, const char *content_type, const char *
     mp_arg->succno = 0;
     mp_arg->check_name = 0;
 	mp_arg->filename = NULL;
-	mp_arg->filepath = NULL;
-	mp_arg->width = 0;
     multipart_parser_set_data(parser, mp_arg);
     multipart_parser_execute(parser, buff, post_size);
     multipart_parser_free(parser);
@@ -751,12 +695,8 @@ int multipart_parse(evhtp_request_t *req, const char *content_type, const char *
     err_no = -1;
 
 done:
-    if(mp_arg->filename)
+    if(mp_arg && mp_arg->filename)
         free(mp_arg->filename);
-	if (mp_arg->filepath)
-	{
-		free(mp_arg->filepath);
-	}
     free(boundaryPattern);
     free(mp_arg);
     return err_no;
@@ -835,21 +775,11 @@ void post_request_cb(evhtp_request_t *req, void *arg) {
         goto err;
     }
 
-    if (strcmp("mp4",content_type)!=0){
-        if (post_size > settings.max_size) {
-            LOG_PRINT(LOG_DEBUG, "Image Size Too Large! %s",content_type);
-            LOG_PRINT(LOG_ERROR, "%s fail post large", address);
-            err_no = 7;
-            goto err;
-        }
-    }
-    else {
-        if (post_size > settings.video_max_size) {
-            LOG_PRINT(LOG_DEBUG, "File Size Too Large! %s",content_type);
-            LOG_PRINT(LOG_ERROR, "%s fail post large", address);
-            err_no = 7;
-            goto err;
-        }
+    if (post_size > settings.max_size) {
+        LOG_PRINT(LOG_DEBUG, "File Size Too Large! %s",content_type);
+        LOG_PRINT(LOG_ERROR, "%s fail post large", address);
+        err_no = 7;
+        goto err;
     }
     evbuf_t *buf;
     buf = req->buffer_in;
@@ -878,6 +808,7 @@ void post_request_cb(evhtp_request_t *req, void *arg) {
             goto err;
         }
     }
+
     if (strstr(content_type, "multipart/form-data") == NULL) {
         err_no = binary_parse(req, content_type, address, buff, post_size);
     } else {
