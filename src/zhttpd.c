@@ -509,10 +509,6 @@ int on_header_value(multipart_parser* p, const char *at, size_t length) {
         }
     }
 
-    if(!mp_arg->filename)
-    {
-        mp_arg->check_name = -1;
-    }
     //multipart_parser_set_data(p, mp_arg);
     char *header_value = (char *)malloc(length + 1);
     snprintf(header_value, length + 1, "%s", at);
